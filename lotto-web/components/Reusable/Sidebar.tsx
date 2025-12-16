@@ -42,6 +42,12 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
           href: "/bid",
           items: [],
         },
+        {
+          icon: CiMoneyBill,
+          title: "Results",
+          href: "/results",
+          items: [],
+        },
 
         // ------------ MANAGE AGENTS ------------
         {

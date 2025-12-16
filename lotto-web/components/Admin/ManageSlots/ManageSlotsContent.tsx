@@ -57,6 +57,27 @@ export interface SlotData {
   totalUnits?: number;
 }
 
+const MY_TZ_OFFSET_MINUTES = 8 * 60;
+
+function malaysiaDateTimeToUTCISO(date: Date, time24: string) {
+  const [hours, minutes] = time24.split(":").map(Number);
+
+  // Build UTC date manually
+  const utcDate = new Date(
+    Date.UTC(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      hours - 8, // convert MYT → UTC
+      minutes,
+      0,
+      0
+    )
+  );
+
+  return utcDate.toISOString();
+}
+
 const ManageSlotsContent = () => {
   const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
   const [slotsData, setSlotsData] = useState<SlotData[]>([]);
@@ -217,35 +238,23 @@ const ManageSlotsContent = () => {
   };
 
   const handleCreateSlot = async () => {
-    try {
-      const slotTime = formatDateTimeToISO(newSlot.date, newSlot.time);
-      const windowCloseAt = formatDateTimeToISO(
-        newSlot.date,
-        newSlot.windowCloseTime
-      );
+    const slotTime = malaysiaDateTimeToUTCISO(newSlot.date, newSlot.time);
+    const windowCloseAt = malaysiaDateTimeToUTCISO(
+      newSlot.date,
+      newSlot.windowCloseTime
+    );
 
-      await createSlot({
-        type: newSlot.type,
-        slotTime,
-        settingsJson: {
-          bidPrize: newSlot.bidPrize,
-          winningPrize: newSlot.winningPrize,
-          windowCloseAt,
-        },
-      });
-      setCreateDialogOpen(false);
-      setNewSlot({
-        type: SlotType.LD,
-        date: new Date(),
-        time: "12:00",
-        windowCloseTime: "11:30",
-        bidPrize: 0,
-        winningPrize: 0,
-      });
-      fetchSlots();
-    } catch (error) {
-      console.error("Error creating slot:", error);
-    }
+    await createSlot({
+      type: newSlot.type,
+      slotTime,
+      settingsJson: {
+        bidPrize: newSlot.bidPrize,
+        winningPrize: newSlot.winningPrize,
+        windowCloseAt,
+      },
+    });
+
+    fetchSlots();
   };
 
   const convertTo24Hour = (time12: string): string => {
@@ -282,28 +291,28 @@ const ManageSlotsContent = () => {
   const handleUpdateSlot = async () => {
     if (!editingSlot) return;
 
-    try {
-      const slotTime = parseTime24ToISO(editingSlot.date, editForm.slotTime);
-      const windowCloseAt = parseTime24ToISO(
-        editingSlot.date,
-        editForm.windowCloseTime
-      );
+    const baseDate = new Date(
+      new Date(editingSlot.slotTime).toLocaleDateString("en-CA", {
+        timeZone: "Asia/Kuala_Lumpur",
+      })
+    );
 
-      await updateSlot(editingSlot.id, {
-        slotTime,
-        settingsJson: {
-          bidPrize: editForm.bidPrize,
-          winningPrize: editForm.winningPrize,
-          windowCloseAt,
-        },
-      });
+    const slotTime = malaysiaDateTimeToUTCISO(baseDate, editForm.slotTime);
+    const windowCloseAt = malaysiaDateTimeToUTCISO(
+      baseDate,
+      editForm.windowCloseTime
+    );
 
-      setEditDialogOpen(false);
-      setEditingSlot(null);
-      fetchSlots();
-    } catch (error) {
-      console.error("Error updating slot:", error);
-    }
+    await updateSlot(editingSlot.id, {
+      slotTime,
+      settingsJson: {
+        bidPrize: editForm.bidPrize,
+        winningPrize: editForm.winningPrize,
+        windowCloseAt,
+      },
+    });
+
+    fetchSlots();
   };
 
   const handleGenerateSlots = async () => {
