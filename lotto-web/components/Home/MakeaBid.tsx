@@ -1,4 +1,5 @@
 "use client";
+
 import { BgShapes } from "../Reusable/Images";
 import Link from "next/link";
 import { useEffect, useState, useRef, useMemo } from "react";
@@ -8,7 +9,16 @@ import { format, parseISO, addDays } from "date-fns";
 import { toZonedTime, formatInTimeZone } from "date-fns-tz";
 
 const MYT = "Asia/Kuala_Lumpur";
+
 const fmtMYT = (iso: string, f: string) => formatInTimeZone(iso, MYT, f);
+
+const minutesUntilSlot = (slot: Slot) => {
+  const nowMYT = toZonedTime(new Date(), MYT).getTime();
+  const slotMYT = toZonedTime(parseISO(slot.slotTime), MYT).getTime();
+  return Math.floor((slotMYT - nowMYT) / 60000);
+};
+
+const getVideoPlayedKey = (slotId: string) => `ld_video_played_${slotId}`;
 
 const MakeaBid = () => {
   const [allSlots, setAllSlots] = useState<Slot[]>([]);
@@ -18,9 +28,13 @@ const MakeaBid = () => {
   const [timeLeft, setTimeLeft] = useState("00:00:00");
   const [winnerNumber, setWinnerNumber] = useState("??");
   const [displayDate, setDisplayDate] = useState({ month: "", date: "" });
+
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Load all slots + results (same as LuckyDrawResults page)
+  /* ------------------------------------------------------------------ */
+  /* INITIAL LOAD                                                        */
+  /* ------------------------------------------------------------------ */
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -30,11 +44,8 @@ const MakeaBid = () => {
           getAllResults(),
         ]);
 
-        const ldSlots = (slots as Slot[]).filter(s => s.type === "LD");
-        const ldResults = results.filter(r => r.type === "LD");
-
-        setAllSlots(ldSlots);
-        setAllResults(ldResults);
+        setAllSlots(slots.filter((s: any) => s.type === "LD"));
+        setAllResults(results.filter((r) => r.type === "LD"));
       } catch (err) {
         console.error("Failed to load data", err);
       } finally {
@@ -44,57 +55,68 @@ const MakeaBid = () => {
     load();
   }, []);
 
-  // Active day slots (today or tomorrow)
+  /* ------------------------------------------------------------------ */
+  /* TODAY / TOMORROW SLOTS                                              */
+  /* ------------------------------------------------------------------ */
+
   const activeDaySlots = useMemo(() => {
     const nowMYT = toZonedTime(new Date(), MYT);
     const today = fmtMYT(nowMYT.toISOString(), "yyyy-MM-dd");
     const tomorrow = fmtMYT(addDays(nowMYT, 1).toISOString(), "yyyy-MM-dd");
 
-    const todaySlots = allSlots.filter(s => fmtMYT(s.slotTime, "yyyy-MM-dd") === today);
-    const tomorrowSlots = allSlots.filter(s => fmtMYT(s.slotTime, "yyyy-MM-dd") === tomorrow);
+    const todaySlots = allSlots.filter(
+      (s) => fmtMYT(s.slotTime, "yyyy-MM-dd") === today
+    );
+
+    const tomorrowSlots = allSlots.filter(
+      (s) => fmtMYT(s.slotTime, "yyyy-MM-dd") === tomorrow
+    );
 
     return todaySlots.length > 0 ? todaySlots : tomorrowSlots;
   }, [allSlots]);
 
-  // Auto-select next open slot
+  /* ------------------------------------------------------------------ */
+  /* AUTO SELECT NEXT OPEN SLOT                                          */
+  /* ------------------------------------------------------------------ */
+
   useEffect(() => {
-    const update = () => {
-      if (activeDaySlots.length === 0) return;
+    if (activeDaySlots.length === 0) return;
 
-      const now = toZonedTime(new Date(), MYT).getTime();
+    const nowMYT = toZonedTime(new Date(), MYT).getTime();
 
-      const openSlot = activeDaySlots.find(s => {
-        const close = toZonedTime(parseISO(s.windowCloseAt || s.slotTime), MYT).getTime();
-        return close > now;
-      });
+    const openSlot = activeDaySlots.find((s) => {
+      const closeMYT = toZonedTime(
+        parseISO(s.windowCloseAt || s.slotTime),
+        MYT
+      ).getTime();
+      return closeMYT > nowMYT;
+    });
 
-      const autoSlot = openSlot || activeDaySlots[activeDaySlots.length - 1];
+    const slot = openSlot || activeDaySlots[activeDaySlots.length - 1];
+    setSelectedSlot(slot);
 
-      if (!selectedSlot || !activeDaySlots.some(s => s.id === selectedSlot.id)) {
-        setSelectedSlot(autoSlot);
-      }
+    const d = toZonedTime(parseISO(slot.slotTime), MYT);
+    setDisplayDate({
+      month: format(d, "MMMM"),
+      date: format(d, "d"),
+    });
+  }, [activeDaySlots]);
 
-      const dateObj = toZonedTime(parseISO(autoSlot.slotTime), MYT);
-      setDisplayDate({
-        month: format(dateObj, "MMMM"),
-        date: format(dateObj, "d"),
-      });
-    };
+  /* ------------------------------------------------------------------ */
+  /* COUNTDOWN TIMER                                                     */
+  /* ------------------------------------------------------------------ */
 
-    update();
-    const id = setInterval(update, 1000);
-    return () => clearInterval(id);
-  }, [activeDaySlots, selectedSlot]);
-
-  // Timer
   useEffect(() => {
     if (!selectedSlot) return;
 
     const tick = () => {
       const now = toZonedTime(new Date(), MYT).getTime();
-      const close = toZonedTime(parseISO(selectedSlot.windowCloseAt || selectedSlot.slotTime), MYT).getTime();
-      const diff = close - now;
+      const close = toZonedTime(
+        parseISO(selectedSlot.windowCloseAt || selectedSlot.slotTime),
+        MYT
+      ).getTime();
 
+      const diff = close - now;
       if (diff <= 0) {
         setTimeLeft("00:00:00");
         return;
@@ -111,28 +133,99 @@ const MakeaBid = () => {
     return () => clearInterval(id);
   }, [selectedSlot]);
 
-  // Winner Number — using exact same logic as LuckyDrawResults (by slot.id)
+  /* ------------------------------------------------------------------ */
+  /* POLL RESULTS (ONLY WITHIN 30 MINS)                                  */
+  /* ------------------------------------------------------------------ */
+
+  useEffect(() => {
+    if (!selectedSlot) return;
+
+    const minsLeft = minutesUntilSlot(selectedSlot);
+
+    if (minsLeft > 30) return;
+
+    const hasResult = allResults.some((r) => r.slotId === selectedSlot.id);
+    if (hasResult) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const results = await getAllResults();
+        setAllResults(results.filter((r) => r.type === "LD"));
+
+        console.log("Results from polling: ", results);
+      } catch (e) {
+        console.error("Polling failed", e);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [selectedSlot, allResults]);
+
+  /* ------------------------------------------------------------------ */
+  /* WINNER NUMBER                                                       */
+  /* ------------------------------------------------------------------ */
+
   useEffect(() => {
     if (!selectedSlot) {
       setWinnerNumber("??");
       return;
     }
 
-    const result = allResults.find(r => r.slotId === selectedSlot.id);
-    setWinnerNumber(result?.winningNumber ? String(result.winningNumber).padStart(2, "0") : "??");
+    const result = allResults.find((r) => r.slotId === selectedSlot.id);
+
+    setWinnerNumber(
+      result?.winningNumber
+        ? String(result.winningNumber).padStart(2, "0")
+        : "??"
+    );
   }, [selectedSlot, allResults]);
 
-  // Video
+  /* ------------------------------------------------------------------ */
+  /* VIDEO — PLAY ONCE PER SESSION                                       */
+  /* ------------------------------------------------------------------ */
+
+  useEffect(() => {
+    if (!videoRef.current || !selectedSlot) return;
+
+    const video = videoRef.current;
+    const key = getVideoPlayedKey(selectedSlot.id);
+
+    // No result → show first frame only
+    if (winnerNumber === "??") {
+      video.pause();
+      video.currentTime = 0;
+      return;
+    }
+
+    // Already completed for this slot → do nothing
+    if (sessionStorage.getItem(key)) return;
+
+    // Ensure clean start
+    video.currentTime = 0;
+
+    const onEnded = () => {
+      sessionStorage.setItem(key, "true"); // ✅ mark only after FULL play
+    };
+
+    video.addEventListener("ended", onEnded);
+
+    video.play().catch((err) => {
+      console.warn("Video play blocked:", err);
+    });
+
+    return () => {
+      video.removeEventListener("ended", onEnded);
+    };
+  }, [winnerNumber, selectedSlot]);
+
   useEffect(() => {
     if (!videoRef.current) return;
-    const num = winnerNumber === "??" ? "spin-only" : "10";
-    const src = `/videos/${num}.mp4`;
-    if (videoRef.current.src !== src) {
-      videoRef.current.src = src;
-      videoRef.current.load();
-      videoRef.current.play().catch(() => {});
-    }
-  }, [winnerNumber]);
+
+    videoRef.current.pause();
+    videoRef.current.currentTime = 0;
+  }, [selectedSlot?.id]);
+
+  /* ------------------------------------------------------------------ */
 
   const formatTimeDisplay = (time: string) => {
     const [h, m] = time.split(":").map(Number);
@@ -143,9 +236,17 @@ const MakeaBid = () => {
 
   const nowMYT = toZonedTime(new Date(), MYT).getTime();
   const isBiddingOpen = selectedSlot
-    ? toZonedTime(parseISO(selectedSlot.windowCloseAt || selectedSlot.slotTime), MYT).getTime() > nowMYT
+    ? toZonedTime(
+        parseISO(selectedSlot.windowCloseAt || selectedSlot.slotTime),
+        MYT
+      ).getTime() > nowMYT
     : false;
+
   const hasResult = winnerNumber !== "??";
+
+  /* ------------------------------------------------------------------ */
+  /* RENDER                                                             */
+  /* ------------------------------------------------------------------ */
 
   return (
     <div className="min-h-screen flex flex-col gap-5 lg:flex-row">
@@ -154,9 +255,8 @@ const MakeaBid = () => {
         <video
           ref={videoRef}
           className="max-w-full max-h-full object-contain rounded-xl"
-          loop
           playsInline
-          autoPlay
+          preload="metadata"
         >
           <source src="/videos/10.mp4" type="video/mp4" />
         </video>
@@ -164,47 +264,50 @@ const MakeaBid = () => {
 
       {/* Content */}
       <div
-        className="w-full lg:w-[50%] flex flex-col justify-center px-4 sm:px-6 md:px-8 lg:px-12 py-6 md:py-0 xl:py-0 bg-cover bg-center bg-no-repeat"
+        className="w-full lg:w-[50%] flex flex-col justify-center px-4 sm:px-6 md:px-8 lg:px-12 py-6 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: `url(${BgShapes.src})` }}
       >
+        {/* GLASS CARD */}
         <div className="relative p-4 sm:p-5 md:p-6 lg:p-7 w-full border border-white/20 bg-white/10 backdrop-blur-xl shadow-lg">
-          <div className="flex flex-col lg:flex-row items-start justify-between gap-6 lg:gap-0">
+          <div className="flex flex-col lg:flex-row items-start justify-between gap-6">
             {/* Date + Timer */}
-            <div className="w-full lg:w-auto">
-              <h1 className="text-2xl sm:text-3xl md:text-[37px] font-regular">{displayDate.month}</h1>
-              <p className="text-6xl sm:text-7xl md:text-8xl lg:text-[122px] text-[#FF5959] leading-none">
+            <div>
+              <h1 className="text-3xl">{displayDate.month}</h1>
+              <p className="text-[110px] text-[#FF5959] leading-none">
                 {displayDate.date}
               </p>
+
               {timeLeft !== "00:00:00" && (
-                <div className="flex flex-col mt-2 md:mt-0">
-                  <h1 className="text-black/50 leading-6 text-sm sm:text-base">Draw Result in</h1>
-                  <p className="text-xl sm:text-2xl md:text-3xl leading-[130%] font-regular text-black/50 mt-2">
-                    {timeLeft}
-                  </p>
-                </div>
+                <p className="text-xl text-black/50 mt-2">
+                  Draw Result in {timeLeft}
+                </p>
               )}
             </div>
 
-            {/* Time Slots */}
-            <div className="flex flex-col w-full lg:w-[60%] justify-between gap-6">
-              <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-5 lg:gap-7">
+            {/* Slots */}
+            <div className="flex flex-col w-full lg:w-[60%] gap-6">
+              <div className="grid grid-cols-2 gap-4">
                 {loading ? (
-                  <p className="col-span-2 text-center text-gray-500">Loading...</p>
-                ) : activeDaySlots.length === 0 ? (
-                  <p className="col-span-2 text-center text-red-600">No slots</p>
+                  <p className="col-span-2 text-center text-gray-500">
+                    Loading...
+                  </p>
                 ) : (
                   activeDaySlots.map((slot) => (
                     <button
                       key={slot.id}
                       onClick={() => setSelectedSlot(slot)}
-                      className={`text-sm rounded-[8px] sm:text-base md:text-lg lg:text-[20px] px-3 sm:px-4 md:px-5 lg:px-6 py-2 sm:py-2.5 md:py-3 font-regular transition-colors duration-300 flex flex-col items-center gap-1 ${
+                      className={`rounded-lg px-5 py-3 transition ${
                         selectedSlot?.id === slot.id
                           ? "bg-primary text-white"
-                          : "text-primary bg-white hover:bg-primary hover:text-white"
+                          : "bg-white text-primary hover:bg-primary hover:text-white"
                       }`}
                     >
-                      <span>{formatTimeDisplay(fmtMYT(slot.slotTime, "HH:mm"))}</span>
-                      <span className="text-xs opacity-75">{slot.uniqueSlotId}</span>
+                      <span className="block text-lg">
+                        {formatTimeDisplay(fmtMYT(slot.slotTime, "HH:mm"))}
+                      </span>
+                      <span className="text-xs opacity-75">
+                        {slot.uniqueSlotId}
+                      </span>
                     </button>
                   ))
                 )}
@@ -212,30 +315,37 @@ const MakeaBid = () => {
 
               <Link
                 href={isBiddingOpen && !hasResult ? "/bid" : "#"}
-                onClick={(e) => (!isBiddingOpen || hasResult) && e.preventDefault()}
-                className={`block w-full text-center bg-primary text-white text-base sm:text-lg md:text-xl lg:text-[21px] rounded-full font-regular py-2.5 sm:py-3 transition-colors duration-300 ${
+                onClick={(e) =>
+                  (!isBiddingOpen || hasResult) && e.preventDefault()
+                }
+                className={`block text-center rounded-full py-3 text-white ${
                   isBiddingOpen && !hasResult
-                    ? "hover:bg-thunderbird-800"
-                    : "opacity-60 cursor-not-allowed"
+                    ? "bg-primary hover:bg-thunderbird-800"
+                    : "bg-gray-400 cursor-not-allowed"
                 }`}
               >
-                {isBiddingOpen && !hasResult ? "Make a Bid" : hasResult ? "Result Announced" : "Bidding Closed"}
+                {hasResult
+                  ? "Result Announced"
+                  : isBiddingOpen
+                  ? "Make a Bid"
+                  : "Bidding Closed"}
               </Link>
             </div>
           </div>
         </div>
 
-        {/* Winner Box */}
+        {/* WINNER GLASS */}
         <div
           style={{
-            clipPath: "polygon(0 0, 100% 0, 100% 70%, calc(100% - 30px) 100%, 0 100%)",
+            clipPath:
+              "polygon(0 0, 100% 0, 100% 70%, calc(100% - 30px) 100%, 0 100%)",
           }}
-          className="relative flex flex-col w-full sm:w-72 md:w-[60%] h-auto min-h-[120px] sm:min-h-[130px] md:h-[14vh] bg-primary/10 backdrop-blur-xl shadow mt-5 p-4 sm:p-5 md:px-6 lg:px-7 border border-white/20 bg-white/10 backdrop-blur-xl shadow-lg"
+          className="relative mt-5 p-5 bg-primary/10 backdrop-blur-xl border border-white/20 shadow-lg w-full sm:w-72 md:w-[60%]"
         >
-          <h1 className="text-black text-2xl sm:text-3xl md:text-[36px] leading-tight">Winner</h1>
-          <span className="text-6xl sm:text-7xl md:text-8xl lg:text-[65px] text-[#FF5959] leading-none">
+          <h2 className="text-3xl">Winner</h2>
+          <p className="text-[70px] text-[#FF5959] leading-none">
             {winnerNumber}
-          </span>
+          </p>
         </div>
       </div>
     </div>

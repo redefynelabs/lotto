@@ -49,6 +49,10 @@ export interface SlotData {
   date: string;
   slotTime: string;
   windowCloseTime: string;
+
+  slotTimeUTC: string;
+  windowCloseUTC: string;
+
   type: string;
   status: SlotStatus;
   bidPrize: number;
@@ -162,45 +166,46 @@ const ManageSlotsContent = () => {
         return;
       }
 
-      const formattedSlots: SlotData[] = slots.map((slot: Slot) => {
-        console.log("Processing slot:", slot);
-        console.log("settingsJson:", slot.settingsJson);
-        console.log("bidPrize:", slot.settingsJson?.bidPrize);
-        console.log("winningPrize:", slot.settingsJson?.winningPrize);
+      const formattedSlots: SlotData[] = slots.map((slot: Slot) => ({
+        id: slot.id,
+        slotId: slot.uniqueSlotId,
 
-        return {
-          id: slot.id,
-          slotId: slot.uniqueSlotId,
-          date: new Date(slot.slotTime).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            timeZone: "Asia/Kuala_Lumpur",
-          }),
+        // existing UI fields (unchanged)
+        date: new Date(slot.slotTime).toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          timeZone: "Asia/Kuala_Lumpur",
+        }),
 
-          slotTime: new Date(slot.slotTime).toLocaleTimeString("en-US", {
+        slotTime: new Date(slot.slotTime).toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+          timeZone: "Asia/Kuala_Lumpur",
+        }),
+
+        windowCloseTime: new Date(slot.windowCloseAt).toLocaleTimeString(
+          "en-US",
+          {
             hour: "2-digit",
             minute: "2-digit",
             hour12: true,
             timeZone: "Asia/Kuala_Lumpur",
-          }),
+          }
+        ),
 
-          windowCloseTime: new Date(slot.windowCloseAt).toLocaleTimeString(
-            "en-US",
-            {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: true,
-              timeZone: "Asia/Kuala_Lumpur",
-            }
-          ),
-          type: slot.type,
-          status: slot.status,
-          bidPrize: slot.settingsJson?.bidPrize || 0,
-          winningPrize: slot.settingsJson?.winningPrize || 0,
-          totalUnits: slot.totalUnits ?? 0,
-        };
-      });
+        // ✅ ADD RAW UTC (no UI usage)
+        slotTimeUTC: slot.slotTime,
+        windowCloseUTC: slot.windowCloseAt,
+
+        type: slot.type,
+        status: slot.status,
+        bidPrize: slot.settingsJson?.bidPrize || 0,
+        winningPrize: slot.settingsJson?.winningPrize || 0,
+        totalUnits: slot.totalUnits ?? 0,
+      }));
+
       console.log("Formatted slots:", formattedSlots);
       setSlotsData(formattedSlots);
     } catch (error: any) {
@@ -215,6 +220,32 @@ const ManageSlotsContent = () => {
       setLoading(false);
     }
   };
+
+  function calculateWindowCloseTime(slotTime24: string) {
+    const [hh, mm] = slotTime24.split(":").map(Number);
+    const total = hh * 60 + mm - 15;
+    const safe = (total + 1440) % 1440;
+
+    return `${Math.floor(safe / 60)
+      .toString()
+      .padStart(2, "0")}:${(safe % 60).toString().padStart(2, "0")}`;
+  }
+
+  function malaysiaToUTCISO(baseDateMY: Date, time24: string) {
+    const [hh, mm] = time24.split(":").map(Number);
+
+    return new Date(
+      Date.UTC(
+        baseDateMY.getFullYear(),
+        baseDateMY.getMonth(),
+        baseDateMY.getDate(),
+        hh - 8,
+        mm,
+        0,
+        0
+      )
+    ).toISOString();
+  }
 
   const formatDateTimeToISO = (date: Date, time: string): string => {
     const [hours, minutes] = time.split(":");
@@ -254,6 +285,8 @@ const ManageSlotsContent = () => {
       },
     });
 
+    setCreateDialogOpen(false);
+
     fetchSlots();
   };
 
@@ -270,15 +303,22 @@ const ManageSlotsContent = () => {
   };
 
   const handleEditClick = (slot: SlotData) => {
+    const myTime24 = new Date(slot.slotTimeUTC).toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Kuala_Lumpur",
+    });
+
     setEditingSlot(slot);
     setEditForm({
-      windowCloseTime: convertTo24Hour(slot.windowCloseTime),
+      slotTime: myTime24,
+      windowCloseTime: calculateWindowCloseTime(myTime24),
       bidPrize: slot.bidPrize,
       winningPrize: slot.winningPrize,
-      slotTime: convertTo24Hour(slot.slotTime),
     });
+
     setEditDialogOpen(true);
-    setDropdownOpen(null);
   };
 
   const parseTime24ToISO = (dateStr: string, time24: string): string => {
@@ -291,26 +331,28 @@ const ManageSlotsContent = () => {
   const handleUpdateSlot = async () => {
     if (!editingSlot) return;
 
-    const baseDate = new Date(
-      new Date(editingSlot.slotTime).toLocaleDateString("en-CA", {
+    const baseDateMY = new Date(
+      new Date(editingSlot.slotTimeUTC).toLocaleDateString("en-CA", {
         timeZone: "Asia/Kuala_Lumpur",
       })
     );
 
-    const slotTime = malaysiaDateTimeToUTCISO(baseDate, editForm.slotTime);
-    const windowCloseAt = malaysiaDateTimeToUTCISO(
-      baseDate,
-      editForm.windowCloseTime
+    const slotTimeUTC = malaysiaToUTCISO(baseDateMY, editForm.slotTime);
+    const windowCloseUTC = malaysiaToUTCISO(
+      baseDateMY,
+      calculateWindowCloseTime(editForm.slotTime)
     );
 
     await updateSlot(editingSlot.id, {
-      slotTime,
+      slotTime: slotTimeUTC,
       settingsJson: {
         bidPrize: editForm.bidPrize,
         winningPrize: editForm.winningPrize,
-        windowCloseAt,
+        windowCloseAt: windowCloseUTC,
       },
     });
+    setEditDialogOpen(false); // close modal
+    setEditingSlot(null); // reset state
 
     fetchSlots();
   };
@@ -574,7 +616,13 @@ const ManageSlotsContent = () => {
                   <div className="flex justify-center">
                     <TimePicker
                       value={newSlot.time}
-                      onChange={(time) => setNewSlot({ ...newSlot, time })}
+                      onChange={(time) =>
+                        setNewSlot((prev) => ({
+                          ...prev,
+                          time,
+                          windowCloseTime: calculateWindowCloseTime(time),
+                        }))
+                      }
                       label="Select Slot Time"
                       buttonClassName="w-full"
                     />
@@ -588,11 +636,9 @@ const ManageSlotsContent = () => {
                   <div className="flex justify-center">
                     <TimePicker
                       value={newSlot.windowCloseTime}
-                      onChange={(time) =>
-                        setNewSlot({ ...newSlot, windowCloseTime: time })
-                      }
-                      label="Select Window Close Time"
-                      buttonClassName="w-full"
+                      onChange={() => {}}
+                      label="Window closes 15 mins before"
+                      buttonClassName="w-full pointer-events-none opacity-70"
                     />
                   </div>
                 </div>
@@ -767,11 +813,15 @@ const ManageSlotsContent = () => {
                 <div className="flex justify-center">
                   <TimePicker
                     value={editForm.slotTime}
-                    onChange={(time) =>
-                      setEditForm({ ...editForm, slotTime: time })
-                    }
                     label="Select Slot Time"
                     buttonClassName="w-full"
+                    onChange={(time) =>
+                      setEditForm((prev) => ({
+                        ...prev,
+                        slotTime: time,
+                        windowCloseTime: calculateWindowCloseTime(time),
+                      }))
+                    }
                   />
                 </div>
               </div>
