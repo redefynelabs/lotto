@@ -365,6 +365,44 @@ const Page = () => {
     return valid;
   };
 
+  const parseAndValidateNumbers = (input: string) => {
+    const raw = input
+      .split("#")
+      .map((v) => v.trim())
+      .filter(Boolean);
+
+    const nums = raw.map(Number);
+
+    if (nums.some((n) => isNaN(n))) {
+      return { error: "Bid number must contain only numbers", values: [] };
+    }
+
+    if (nums.some((n) => n < 0 || n > 37)) {
+      return { error: "Bid number must be between 0 and 37", values: [] };
+    }
+
+    return { values: nums };
+  };
+
+  const parseAndValidateCounts = (input: string) => {
+    const raw = input
+      .split("#")
+      .map((v) => v.trim())
+      .filter(Boolean);
+
+    const nums = raw.map(Number);
+
+    if (nums.some((n) => isNaN(n))) {
+      return { error: "Bid count must contain only numbers", values: [] };
+    }
+
+    if (nums.some((n) => n < 1 || n > 80)) {
+      return { error: "Bid count must be between 1 and 80", values: [] };
+    }
+
+    return { values: nums };
+  };
+
   // submit add/edit to local cart (DO NOT send to backend here)
   const handleSubmit = async () => {
     if (!date || !selectedSlot) {
@@ -374,33 +412,90 @@ const Page = () => {
 
     if (!validateForm()) return;
 
-    // 🛑 Block more than 5 bids
+    // 🛑 Block more than 5 bids (ADD MODE ONLY)
     if (!editingBid && filteredBids.length >= 5) {
       toast.warning("You can't bid more than 5 per order");
       return;
     }
 
     setLoading(true);
-    try {
-      if (activeSection === "lucky") {
-        const bid: BidData = {
-          id:
-            editingBid || `LD_${Date.now()}_${luckyDrawFormData.customerPhone}`,
-          slotId: selectedSlot.id,
-          customer_name: luckyDrawFormData.customerName,
-          customer_phone: luckyDrawFormData.customerPhone,
-          bid_number: parseInt(luckyDrawFormData.bidNumber),
-          bid_count: parseInt(luckyDrawFormData.bidCount),
-          date: format(date, "yyyy-MM-dd"),
-          time: selectedSlot.slotTimeFormatted,
-        };
 
-        setLuckyDrawBidCart((prev) =>
-          editingBid
-            ? prev.map((b) => (b.id === editingBid ? bid : b))
-            : [...prev, bid]
-        );
+    try {
+      /* ======================================================
+       🎯 LUCKY DRAW
+       ====================================================== */
+      if (activeSection === "lucky") {
+        const isEditing = Boolean(editingBid);
+
+        /* -------------------------
+         ✏️ EDIT MODE → SINGLE BID
+         ------------------------- */
+        if (isEditing) {
+          const bid: BidData = {
+            id: editingBid!,
+            slotId: selectedSlot.id,
+            customer_name: luckyDrawFormData.customerName,
+            customer_phone: luckyDrawFormData.customerPhone,
+            bid_number: parseInt(luckyDrawFormData.bidNumber),
+            bid_count: parseInt(luckyDrawFormData.bidCount),
+            date: format(date, "yyyy-MM-dd"),
+            time: selectedSlot.slotTimeFormatted,
+          };
+
+          setLuckyDrawBidCart((prev) =>
+            prev.map((b) => (b.id === editingBid ? bid : b))
+          );
+        } else {
+          /* -------------------------
+         ➕ ADD MODE → MULTI BID
+         ------------------------- */
+          const numResult = parseAndValidateNumbers(
+            luckyDrawFormData.bidNumber
+          );
+          if (numResult.error) {
+            setErrors((p) => ({ ...p, bidNumber: numResult.error }));
+            return;
+          }
+
+          const countResult = parseAndValidateCounts(
+            luckyDrawFormData.bidCount
+          );
+          if (countResult.error) {
+            setErrors((p) => ({ ...p, bidCount: countResult.error }));
+            return;
+          }
+
+          const numbers = numResult.values;
+          const counts = countResult.values;
+
+          if (numbers.length !== counts.length) {
+            setErrors((p) => ({
+              ...p,
+              bidCount: "Numbers and counts must match in quantity",
+            }));
+            return;
+          }
+
+          const now = Date.now();
+
+          const newBids: BidData[] = numbers.map((num, index) => ({
+            id: `LD_${now}_${index}_${num}_${luckyDrawFormData.customerPhone}`,
+            slotId: selectedSlot.id,
+            customer_name: luckyDrawFormData.customerName,
+            customer_phone: luckyDrawFormData.customerPhone,
+            bid_number: num,
+            bid_count: counts[index],
+            date: format(date, "yyyy-MM-dd"),
+            time: selectedSlot.slotTimeFormatted,
+          }));
+
+          // 🔥 APPEND ALL AT ONCE
+          setLuckyDrawBidCart((prev) => [...prev, ...newBids]);
+        }
       } else {
+        /* ======================================================
+       🎰 JACKPOT (UNCHANGED)
+       ====================================================== */
         const bid: JackpotBidData = {
           id: editingBid || `JP_${Date.now()}_${jackpotFormData.customerPhone}`,
           slotId: selectedSlot.id,
