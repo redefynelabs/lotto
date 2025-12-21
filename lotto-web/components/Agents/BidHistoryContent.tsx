@@ -166,7 +166,6 @@ const shareBid = async (bid: BidHistoryRow) => {
     type: "image/png",
   });
 
-  // Optional caption (WhatsApp shows this below image)
   const text = `🎟️ Bid Ticket
 ID: ${bid.id}
 Customer: ${bid.custName || "—"}
@@ -177,17 +176,20 @@ Amount: RM ${bid.amount.toFixed(2)}
 Date: ${bid.dateStr} ${bid.timeStr}
 Status: ${bid.status}`;
 
-  // ✅ MOBILE + MODERN BROWSERS
+  // Copy text as backup (CRITICAL)
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {}
+
   if (navigator.canShare?.({ files: [file] })) {
     await navigator.share({
+      files: [file], // image
       title: "Bid Ticket",
-      text, // caption
-      files: [file], // IMAGE
     });
     return;
   }
 
-  // ✅ DESKTOP FALLBACK
+  // Desktop fallback
   const url = URL.createObjectURL(imageBlob);
   window.open(url, "_blank");
 };
