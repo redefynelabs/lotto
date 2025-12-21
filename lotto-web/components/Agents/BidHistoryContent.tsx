@@ -10,6 +10,9 @@ import { format } from "date-fns";
 import { Trophy, Clock, XCircle, Hash } from "lucide-react";
 import { Printer, Share2 } from "lucide-react";
 import html2canvas from "html2canvas";
+import { Ban } from "lucide-react";
+import { cancelBid } from "@/services/Bidding";
+import { toast } from "react-toastify";
 
 interface BidHistoryRow {
   id: string;
@@ -21,7 +24,7 @@ interface BidHistoryRow {
   bidNumber: string;
   count: number;
   amount: number;
-  status: "Winner" | "Lost" | "Pending";
+  status: "Winner" | "Lost" | "Pending" | "Cancelled";
   slotType: "LD" | "JP";
 }
 
@@ -53,6 +56,7 @@ const StatusBadge = ({ status }: { status: string }) => {
     Winner: { icon: Trophy, color: "bg-green-100 text-green-800" },
     Lost: { icon: XCircle, color: "bg-red-100 text-red-800" },
     Pending: { icon: Clock, color: "bg-yellow-100 text-yellow-800" },
+    Cancelled: { icon: XCircle, color: "bg-gray-100 text-gray-600" }, // ✅
   }[status];
 
   const Icon = config?.icon || Clock;
@@ -270,19 +274,54 @@ const Row = ({ label, value }: { label: string; value: any }) => (
   </div>
 );
 
-const BidActions = ({ bid }: { bid: BidHistoryRow }) => {
+const BidActions = ({ bid }: { bid: BidHistoryRow & any }) => {
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const canCancel =
+    bid.rawStatus !== "CANCELLED" &&
+    bid.slotStatus === "OPEN" &&
+    bid.windowCloseAt &&
+    new Date() < new Date(bid.windowCloseAt);
+
+  const onCancel = async () => {
+    if (!confirm("Are you sure you want to cancel this bid?")) return;
+
+    try {
+      setLoading(true);
+      await cancelBid(bid.rawId);
+      toast.success("Bid cancelled successfully");
+      window.location.reload(); // simple & safe
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to cancel bid");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <>
       <div className="flex items-center gap-2">
+        {/* Print */}
         <button
           onClick={() => setOpen(true)}
           className="p-1.5 rounded-md hover:bg-muted"
-          title="Print Ticket"
+          title="View / Print"
         >
           <Printer className="w-4 h-4" />
         </button>
+
+        {/* Cancel */}
+        {canCancel && (
+          <button
+            onClick={onCancel}
+            disabled={loading}
+            className="p-1.5 rounded-md hover:bg-red-50 text-red-600"
+            title="Cancel Bid"
+          >
+            <Ban className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {open && <BidTicketModal bid={bid} onClose={() => setOpen(false)} />}
@@ -364,8 +403,14 @@ const BidHistoryContent = () => {
           const timeStr = slotTime ? formatMYTime(slotTime) : "";
 
           // Winner detection
-          let status: "Winner" | "Lost" | "Pending" = "Pending";
-          if (slot.status === "COMPLETED" && slot.drawResult?.winner) {
+          let status: "Winner" | "Lost" | "Pending" | "Cancelled" = "Pending";
+
+          // ✅ CANCELLED FIRST (highest priority)
+          if (b.status === "CANCELLED") {
+            status = "Cancelled";
+          }
+          // Result announced
+          else if (slot.status === "COMPLETED" && slot.drawResult?.winner) {
             const winner = slot.drawResult.winner;
 
             if (slot.type === "LD") {
@@ -373,22 +418,23 @@ const BidHistoryContent = () => {
             }
 
             if (slot.type === "JP" && Array.isArray(b.jpNumbers)) {
-              const bid = b.jpNumbers
-                .sort((a: number, b: number) => a - b)
-                .join(",");
+              const bid = [...b.jpNumbers].sort((a, b) => a - b).join(",");
               const win = winner
                 .split(/[-,\s]+/)
-                .map((x: string) => x.trim())
-                .filter(Boolean)
                 .map(Number)
-                .sort((a: number, b: number) => a - b)
+                .sort((a:number, b:number) => a - b)
                 .join(",");
+
               status = bid === win ? "Winner" : "Lost";
             }
           }
 
           return {
             id: b.uniqueBidId,
+            rawId: b.id, // 🔑 needed for cancel API
+            rawStatus: b.status,
+            slotStatus: slot.status,
+            windowCloseAt: slot.windowCloseAt,
             custName: b.customerName,
             number: b.customerPhone || "—",
             date: slotTime,
@@ -403,7 +449,7 @@ const BidHistoryContent = () => {
             count: Number(b.count) || 1,
             amount: Number(b.amount) || 0,
             status,
-            slotType: (slot.type as "LD" | "JP") || "LD",
+            slotType: slot.type as "LD" | "JP",
           };
         });
 

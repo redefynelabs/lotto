@@ -30,15 +30,23 @@ export interface CreateBidResponse {
 
 export interface MyBid {
   id: string;
+  uniqueBidId: string;
   customerName: string;
   customerPhone: string;
   slotId: string;
   number?: number;
   count?: number;
   jpNumbers?: number[];
-  note?: string;
+  amount: number;
+  status?: "ACTIVE" | "CANCELLED";
   createdAt: string;
+  slot?: {
+    status: "OPEN" | "CLOSED" | "COMPLETED";
+    windowCloseAt: string;
+    type: "LD" | "JP";
+  };
 }
+
 
 export interface MyBidResponse {
   items: MyBid[];
@@ -47,10 +55,20 @@ export interface MyBidResponse {
   pageSize: number;
 }
 
+export interface CancelBidResponse {
+  message: string;
+}
 
 export const createBid = async (payload: CreateBidPayload): Promise<CreateBidResponse> => {
     const { data } = await api.post<CreateBidResponse>("/bids/create", payload);
     return data;
+};
+
+
+
+export const cancelBid = async (bidId: string): Promise<CancelBidResponse> => {
+  const { data } = await api.post<CancelBidResponse>(`/bids/cancel/${bidId}`);
+  return data;
 };
 
 // export const getRemainingBid = async (slotId: string, number: number): Promise<RemainingBidResponse> => {
