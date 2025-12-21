@@ -43,6 +43,12 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
           items: [],
         },
         {
+          icon: CiReceipt,
+          title: "Bid History",
+          href: "/admin/bid-history",
+          items: [],
+        },
+        {
           icon: CiMoneyBill,
           title: "Results",
           href: "/results",
@@ -102,20 +108,20 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
               icon: LiaGiftSolid,
               title: "Winning Payments",
               href: "/admin/wallet/winning-payment",
-            }
+            },
           ],
         },
 
         {
-          title : "System Settings",
-          items:[
-             {
+          title: "System Settings",
+          items: [
+            {
               icon: CiDiscount1,
               title: "Settings",
               href: "/admin/settings",
             },
-          ]
-        }
+          ],
+        },
       ];
     }
 
@@ -158,7 +164,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
 
   const SidebarContent = () => (
     <>
-      <Link href={'/'} className="p-4 flex items-center justify-center">
+      <Link href={"/"} className="p-4 flex items-center justify-center">
         <Image src={CompanyLogo} alt="32 win" className="w-16" />
       </Link>
 
@@ -172,9 +178,10 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
                   href={item.href}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={`flex items-center gap-3 px-4 py-2 mx-4 rounded-md text-sm font-medium relative
-                    ${pathname === item.href
-                      ? 'bg-primary text-white before:content-[""] before:absolute before:-left-4 before:top-0 before:bottom-0 before:w-1 before:bg-primary before:rounded-r-md'
-                      : "text-[#202224] hover:bg-gray-50"
+                    ${
+                      pathname === item.href
+                        ? 'bg-primary text-white before:content-[""] before:absolute before:-left-4 before:top-0 before:bottom-0 before:w-1 before:bg-primary before:rounded-r-md'
+                        : "text-[#202224] hover:bg-gray-50"
                     }`}
                 >
                   {item.icon && <item.icon className="w-5 h-5" />}
@@ -197,9 +204,10 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
                     key={i}
                     onClick={() => setIsMobileMenuOpen(false)}
                     className={`flex items-center gap-3 px-4 py-2 mx-4 rounded-md text-sm relative
-                      ${pathname === sub.href
-                        ? 'bg-primary text-white before:content-[""] before:absolute before:-left-4 before:top-0 before:bottom-0 before:w-1 before:bg-primary before:rounded-r-md'
-                        : "text-[#202224] hover:bg-gray-50"
+                      ${
+                        pathname === sub.href
+                          ? 'bg-primary text-white before:content-[""] before:absolute before:-left-4 before:top-0 before:bottom-0 before:w-1 before:bg-primary before:rounded-r-md'
+                          : "text-[#202224] hover:bg-gray-50"
                       }`}
                   >
                     {sub.icon && <sub.icon className="w-5 h-5" />}

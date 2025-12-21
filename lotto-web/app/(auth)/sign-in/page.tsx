@@ -23,6 +23,13 @@ const Page = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const isValidPhone = (phone: string) => {
+    const malaysiaRegex = /^01\d{8,9}$/; // 10–11 digits
+    const indiaRegex = /^[6-9]\d{9}$/; // exactly 10 digits
+
+    return malaysiaRegex.test(phone) || indiaRegex.test(phone);
+  };
+
   const validateForm = () => {
     const newErrors = {
       phone: "",
@@ -30,20 +37,19 @@ const Page = () => {
     };
     let isValid = true;
 
-    // Phone validation
     if (!formData.phone.trim()) {
       newErrors.phone = "Phone number is required";
       isValid = false;
-    } else if (formData.phone.length < 10) {
-      newErrors.phone = "Phone number must be at least 10 digits";
+    } else if (!isValidPhone(formData.phone)) {
+      newErrors.phone = "Enter a valid Malaysian or Indian phone number";
       isValid = false;
     }
 
-    // Password validation
     if (!formData.password) {
       newErrors.password = "Password is required";
       isValid = false;
     }
+
     setErrors(newErrors);
     return isValid;
   };
@@ -137,10 +143,10 @@ const Page = () => {
               type="tel"
               name="phone"
               label="Phone Number"
-              placeholder="9*********"
+              placeholder="01XXXXXXXXX"
               value={formData.phone}
               onChange={handleChange}
-              maxLength={10}
+              maxLength={11}
               className={errors.phone ? "border-red-500" : ""}
             />
             {errors.phone && (

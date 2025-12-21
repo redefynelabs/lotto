@@ -61,6 +61,14 @@ const Page = () => {
   // -----------------------------------
   // VALIDATION
   // -----------------------------------
+
+  const isValidPhone = (phone: string) => {
+    const malaysiaRegex = /^01\d{8,9}$/; // 10–11 digits
+    const indiaRegex = /^[6-9]\d{9}$/; // exactly 10 digits
+
+    return malaysiaRegex.test(phone) || indiaRegex.test(phone);
+  };
+
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
     let isValid = true;
@@ -84,12 +92,11 @@ const Page = () => {
       isValid = false;
     }
 
-    const phoneRegex = /^[0-9]{10}$/;
     if (!formData.phone.trim()) {
       newErrors.phone = "Phone number is required";
       isValid = false;
-    } else if (!phoneRegex.test(formData.phone)) {
-      newErrors.phone = "Enter a valid 10-digit phone number";
+    } else if (!isValidPhone(formData.phone)) {
+      newErrors.phone = "Enter a valid Malaysian or Indian phone number";
       isValid = false;
     }
 
@@ -209,7 +216,7 @@ const Page = () => {
         href="/"
         className="flex items-center gap-2 text-primary hover:underline absolute left-12 top-8"
       >
-        <FaArrowLeft  className="w-5 h-5" />
+        <FaArrowLeft className="w-5 h-5" />
         Back to Home
       </Link>
 
@@ -275,10 +282,10 @@ const Page = () => {
               <Input
                 name="phone"
                 label="Phone Number"
-                placeholder="9876543210"
+                placeholder="01XXXXXXXXX"
                 value={formData.phone}
                 onChange={handleChange}
-                maxLength={10}
+                maxLength={11}
                 inputMode="numeric"
                 className={errors.phone ? "border-red-500" : ""}
               />

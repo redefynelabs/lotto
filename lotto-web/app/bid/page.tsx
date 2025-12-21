@@ -412,11 +412,11 @@ const Page = () => {
 
     if (!validateForm()) return;
 
-    // 🛑 Block more than 5 bids (ADD MODE ONLY)
-    if (!editingBid && filteredBids.length >= 5) {
-      toast.warning("You can't bid more than 5 per order");
-      return;
-    }
+    // // 🛑 Block more than 5 bids (ADD MODE ONLY)
+    // if (!editingBid && filteredBids.length >= 5) {
+    //   toast.warning("You can't bid more than 5 per order");
+    //   return;
+    // }
 
     setLoading(true);
 
