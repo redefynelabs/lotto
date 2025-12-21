@@ -71,18 +71,41 @@ const captureTicketImage = async () => {
   const ticket = document.getElementById("bid-ticket");
   if (!ticket) return null;
 
-  // wait for fonts + paint
+  // 🔒 clone ticket to avoid UI flicker
+  const clone = ticket.cloneNode(true) as HTMLElement;
+
+  clone.style.position = "fixed";
+  clone.style.top = "50%";
+  clone.style.left = "50%";
+  clone.style.transform = "translate(-50%, -50%)";
+  clone.style.margin = "0";
+  clone.style.zIndex = "9999";
+
+  const wrapper = document.createElement("div");
+  wrapper.style.position = "fixed";
+  wrapper.style.inset = "0";
+  wrapper.style.background = "#ffffff";
+  wrapper.style.display = "flex";
+  wrapper.style.alignItems = "center";
+  wrapper.style.justifyContent = "center";
+  wrapper.appendChild(clone);
+
+  document.body.appendChild(wrapper);
+
+  // wait for layout + paint
   await document.fonts?.ready;
   await new Promise((r) => requestAnimationFrame(r));
   await new Promise((r) => setTimeout(r, 150));
 
-  const canvas = await html2canvas(ticket, {
+  const canvas = await html2canvas(clone, {
     scale: 2,
     backgroundColor: "#ffffff",
     useCORS: true,
     allowTaint: true,
     foreignObjectRendering: true,
   });
+
+  document.body.removeChild(wrapper);
 
   return new Promise<Blob | null>((resolve) => {
     canvas.toBlob((blob) => resolve(blob), "image/png");
