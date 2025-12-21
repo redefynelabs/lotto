@@ -71,13 +71,38 @@ const captureTicketImage = async () => {
   const ticket = document.getElementById("bid-ticket");
   if (!ticket) return null;
 
-  // Clone ticket
+  const inlineImages = async (root: HTMLElement) => {
+    const images = Array.from(root.querySelectorAll("img"));
+
+    await Promise.all(
+      images.map(async (img) => {
+        if (!img.src || img.src.startsWith("data:")) return;
+
+        const response = await fetch(img.src);
+        const blob = await response.blob();
+
+        const reader = new FileReader();
+        await new Promise((res) => {
+          reader.onloadend = res;
+          reader.readAsDataURL(blob);
+        });
+
+        img.src = reader.result as string;
+      })
+    );
+  };
+
+  // 🔒 clone ticket
   const clone = ticket.cloneNode(true) as HTMLElement;
 
-  // Measure original ticket size
+  clone.querySelectorAll(".no-capture").forEach((el) => el.remove());
+
+  await inlineImages(clone);
+
+  // measure real size
   const rect = ticket.getBoundingClientRect();
 
-  // Wrapper (controls canvas size)
+  // wrapper
   const wrapper = document.createElement("div");
   wrapper.style.position = "fixed";
   wrapper.style.top = "0";
@@ -90,17 +115,31 @@ const captureTicketImage = async () => {
   wrapper.style.justifyContent = "center";
   wrapper.style.zIndex = "99999";
 
-  // Clone styles (important)
+  clone.style.width = `${Math.ceil(rect.width)}px`;
+  clone.style.margin = "0";
   clone.style.position = "static";
   clone.style.transform = "none";
-  clone.style.margin = "0";
-  clone.style.width = `${Math.ceil(rect.width)}px`;
 
   wrapper.appendChild(clone);
   document.body.appendChild(wrapper);
 
-  // Wait for paint + fonts
+  // 🔑 WAIT FOR EVERYTHING
   await document.fonts?.ready;
+
+  // wait for images inside clone
+  const images = clone.querySelectorAll("img");
+  await Promise.all(
+    Array.from(images).map(
+      (img) =>
+        new Promise((res) => {
+          if (img.complete) return res(true);
+          img.onload = () => res(true);
+          img.onerror = () => res(true);
+        })
+    )
+  );
+
+  // wait for paint
   await new Promise((r) => requestAnimationFrame(r));
   await new Promise((r) => setTimeout(r, 150));
 
@@ -108,6 +147,7 @@ const captureTicketImage = async () => {
     scale: 2,
     backgroundColor: "#ffffff",
     useCORS: true,
+    allowTaint: false,
     foreignObjectRendering: true,
   });
 
@@ -117,7 +157,6 @@ const captureTicketImage = async () => {
     canvas.toBlob((blob) => resolve(blob), "image/png");
   });
 };
-
 
 const shareBid = async (bid: BidHistoryRow) => {
   const imageBlob = await captureTicketImage();
@@ -167,10 +206,16 @@ const BidTicketModal = ({
   <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
     <div
       id="bid-ticket"
-      className="relative bg-white w-full max-w-sm rounded-xl shadow-lg p-6 space-y-4"
+      className="relative bg-white w-full max-w-sm rounded-xl  p-6 space-y-4"
     >
       {/* Logo */}
-      <img src="/companyLogo.png" alt="Logo" className="mx-auto h-10" />
+      <img
+        src="/companyLogo.png"
+        alt="Logo"
+        className="mx-auto h-10"
+        crossOrigin="anonymous"
+        loading="eager"
+      />
 
       {/* Header */}
       <div className="text-center border-b pb-3">
@@ -191,7 +236,7 @@ const BidTicketModal = ({
       </div>
 
       {/* Actions */}
-      <div className="flex gap-3 pt-4 border-t">
+      <div className="flex gap-3 pt-4 border-t print:hidden no-capture">
         <button
           onClick={printTicket}
           className="flex-1 bg-primary text-white py-2 rounded-md"
@@ -208,7 +253,7 @@ const BidTicketModal = ({
 
       <button
         onClick={onClose}
-        className="absolute top-3 right-3 text-muted-foreground"
+        className="absolute top-3 right-3 text-muted-foreground print:hidden no-capture"
       >
         ✕
       </button>
@@ -219,12 +264,9 @@ const BidTicketModal = ({
 const Row = ({ label, value }: { label: string; value: any }) => (
   <div className="grid grid-cols-[1fr_auto] gap-4 items-center">
     <span className="text-muted-foreground">{label}</span>
-    <span className="font-medium text-right whitespace-nowrap">
-      {value}
-    </span>
+    <span className="font-medium text-right whitespace-nowrap">{value}</span>
   </div>
 );
-
 
 const BidActions = ({ bid }: { bid: BidHistoryRow }) => {
   const [open, setOpen] = useState(false);
@@ -238,14 +280,6 @@ const BidActions = ({ bid }: { bid: BidHistoryRow }) => {
           title="Print Ticket"
         >
           <Printer className="w-4 h-4" />
-        </button>
-
-        <button
-          onClick={() => shareBid(bid)}
-          className="p-1.5 rounded-md hover:bg-muted"
-          title="Share Ticket"
-        >
-          <Share2 className="w-4 h-4" />
         </button>
       </div>
 
