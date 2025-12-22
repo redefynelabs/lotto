@@ -1,9 +1,12 @@
-"use client"
-import Chart from './Chart';
-import Header from '../../Reusable/Header';
-import Stats from './Stats';
-import DaysFilter from './DaysFilter';
-import { DaysFilterProvider } from '@/context/DaysFilterContext';
+"use client";
+import Chart from "./Chart";
+import Header from "../../Reusable/Header";
+import Stats from "./Stats";
+import DaysFilter from "./DaysFilter";
+import { DaysFilterProvider } from "@/context/DaysFilterContext";
+import AdminProfitChart from "./AdminProfitCharts";
+import AdminProfitStats from "./AdminProfitCards";
+import TopAgentsTable from "./TopAgentsTable";
 
 interface DashboardContentProps {
   role: string;
@@ -12,8 +15,8 @@ interface DashboardContentProps {
 const DashboardContent = ({ role }: DashboardContentProps) => {
   return (
     <DaysFilterProvider>
-      <div className='flex flex-col items-center'>
-        <div className='flex flex-col w-full space-y-5 px-5 py-5'>
+      <div className="flex flex-col items-center">
+        <div className="flex flex-col w-full space-y-5 px-5 py-5">
           <div className="flex flex-row w-full justify-between items-center">
             <h1 className="md:text-[32px] text-[20px] font-bold text-gray-900">
               {role && role.charAt(0).toUpperCase() + role.slice(1)} Dashboard
@@ -21,7 +24,14 @@ const DashboardContent = ({ role }: DashboardContentProps) => {
             <DaysFilter />
           </div>
           <Stats role={role} />
-          <Chart />
+          <Chart role={role} />
+          {/* {role === "admin" && (
+            <>
+              <AdminProfitStats />
+              <AdminProfitChart />
+              <TopAgentsTable />
+            </>
+          )} */}
         </div>
       </div>
     </DaysFilterProvider>

@@ -17,23 +17,22 @@ async function refreshAccessToken(request: NextRequest) {
 
   try {
     const refreshRes = await fetch(`${BACKEND_API_URL}/auth/refresh`, {
-      method: 'POST',
+      method: "POST",
       headers: {
         // Forward the original request's cookies (including refresh_token) to the backend
-        'Cookie': request.headers.get('cookie') || '', 
-        'Content-Type': 'application/json',
+        Cookie: request.headers.get("cookie") || "",
+        "Content-Type": "application/json",
       },
       // Keep body empty if your backend reads the refresh token from the cookie
     });
 
     // Check for success (200-299 status)
-    if (refreshRes.ok) { 
+    if (refreshRes.ok) {
       return refreshRes;
     }
-    
+
     // 401/403 means refresh token is also invalid/expired
-    return null; 
-    
+    return null;
   } catch (error) {
     // Log network/fetch errors
     console.error("Error during token refresh in middleware:", error);
@@ -52,7 +51,7 @@ export async function proxy(request: NextRequest) {
   let user: any = null;
   if (rawUser) {
     try {
-      const decoded = decodeURIComponent(rawUser); 
+      const decoded = decodeURIComponent(rawUser);
       user = JSON.parse(decoded);
       if (!user || typeof user !== "object") user = null;
     } catch {
@@ -68,16 +67,14 @@ export async function proxy(request: NextRequest) {
     path.startsWith("/agent");
   const isAuthRoute = path === "/sign-in" || path === "/sign-up";
 
-
   // --- IGNORE SPECIAL ROUTES ---
   if (
     path.startsWith("/api/auth/refresh") ||
     path.startsWith("/api/auth/logout") ||
-    !isProtected && !isAuthRoute // Allow public pages
+    (!isProtected && !isAuthRoute) // Allow public pages
   ) {
     return NextResponse.next();
   }
-
 
   // ---------------------------------------
   // 🔑 AUTH CHECK WITH REFRESH LOGIC (Page Protection)
@@ -85,33 +82,32 @@ export async function proxy(request: NextRequest) {
 
   // If a protected page is accessed AND the access token is missing/expired
   if (isProtected && !token) {
-    
     // --- ATTEMPT REFRESH ---
     const refreshResponse = await refreshAccessToken(request);
 
     if (refreshResponse) {
-        console.log("Token refreshed successfully in middleware. Proceeding.");
+      console.log("Token refreshed successfully in middleware. Proceeding.");
 
-        const response = NextResponse.next();
-        
-        // Forward the new cookies to the browser
-        const newCookies = refreshResponse.headers.getSetCookie();
-        newCookies.forEach(cookie => {
-            response.headers.append('Set-Cookie', cookie);
-        });
-        
-        return response; // Success, continue to the protected page
+      const response = NextResponse.next();
+
+      // Forward the new cookies to the browser
+      const newCookies = refreshResponse.headers.getSetCookie();
+      newCookies.forEach((cookie) => {
+        response.headers.append("Set-Cookie", cookie);
+      });
+
+      return response; // Success, continue to the protected page
     } else {
-        // Refresh failed (refresh token expired)
-        
-        // Clear all session cookies and redirect to sign-in
-        const response = NextResponse.redirect(new URL("/sign-in", request.url));
-        response.cookies.delete('access_token');
-        response.cookies.delete('refresh_token');
-        response.cookies.delete('app_user');
-        response.cookies.delete('x-device-id');
-        console.log("Refresh failed. Redirecting to sign-in.");
-        return response;
+      // Refresh failed (refresh token expired)
+
+      // Clear all session cookies and redirect to sign-in
+      const response = NextResponse.redirect(new URL("/sign-in", request.url));
+      response.cookies.delete("access_token");
+      response.cookies.delete("refresh_token");
+      response.cookies.delete("app_user");
+      response.cookies.delete("x-device-id");
+      console.log("Refresh failed. Redirecting to sign-in.");
+      return response;
     }
   }
 
@@ -123,24 +119,37 @@ export async function proxy(request: NextRequest) {
   if (token && !user) {
     return NextResponse.redirect(new URL("/sign-in", request.url));
   }
-  
-  if (path.startsWith("/admin") && user?.role !== "ADMIN") {
-    return NextResponse.redirect(new URL("/sign-in", request.url));
+
+  if (path.startsWith("/admin")) {
+    // Not logged in properly
+    if (!user || !token) {
+      return NextResponse.redirect(new URL("/sign-in", request.url));
+    }
+
+    // Logged in but not admin
+    if (user.role === "AGENT") {
+      return NextResponse.redirect(new URL("/agent/dashboard", request.url));
+    }
+
+    // Optional: USER role
+    if (user.role === "USER") {
+      return NextResponse.redirect(new URL("/sign-in", request.url));
+    }
   }
-  
+
   // ... other role/approval checks ...
-  
+
   // ---------------------------------------
   // ➡️ FINAL PASS
   // ---------------------------------------
-  
+
   // Redirect authenticated users away from login pages
   if (isAuthRoute && token && user) {
-     if (user.role === "ADMIN")
-       return NextResponse.redirect(new URL("/admin", request.url));
-     // ... other role redirects ...
+    if (user.role === "ADMIN")
+      return NextResponse.redirect(new URL("/admin", request.url));
+    // ... other role redirects ...
   }
-  
+
   return NextResponse.next();
 }
 

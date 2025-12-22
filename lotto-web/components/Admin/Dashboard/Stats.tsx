@@ -1,116 +1,230 @@
-"use client"
-import { userLogo, boxLogo, graphLogo, clockLogo } from "@/assets/Dashboard/Stats"
-import Image from "next/image"
+"use client";
+
+import Image from "next/image";
 import { MdTrendingUp, MdTrendingDown } from "react-icons/md";
-import { useDaysFilter } from "@/context/DaysFilterContext";
+import { useEffect, useState } from "react";
+
+import {
+  userLogo,
+  boxLogo,
+  graphLogo,
+  clockLogo,
+} from "@/assets/Dashboard/Stats";
+
+import { useDaysFilter, DaysPeriod } from "@/context/DaysFilterContext";
+import { getAdminSummary, getAgentSummary } from "@/services/dashboard.service";
+
+/* =======================
+   Types
+======================= */
 
 interface StatsProps {
-    role: string;
+  role: string;
 }
 
-interface StatCard {
-    title: string;
-    value: string;
-    growth: string;
-    isPositive: boolean;
-    icon: any;
+interface AgentSummary {
+  totalBids: number;
+  totalCommission: number;
+  totalWinnings: number;
+  totalLosses: number;
 }
+
+interface AdminSummary {
+  totalUsers: number;
+  approvedAgents: number;
+  totalBids: number;
+  totalRevenue: number;
+}
+
+/* =======================
+   Helpers
+======================= */
+
+const normalizeDays = (days: DaysPeriod): number =>
+  typeof days === "string" && days === "all" ? 0 : (days as number);
+
+
+/* =======================
+   Component
+======================= */
 
 const Stats = ({ role }: StatsProps) => {
-    const { days } = useDaysFilter();
-    // Generate stats based on selected days period
-    const getStatsForPeriod = (baseDays: number) => {
-        const multiplier = days / baseDays;
-        return multiplier;
-    };
+  const { days } = useDaysFilter();
+  const normalizedRole = role.toLowerCase();
 
-    const adminStats: StatCard[] = [
-        {
-            title: "Total Users",
-            value: Math.round(2847 * getStatsForPeriod(7)).toLocaleString(),
-            growth: days === 7 ? "+18.2%" : days === 28 ? "+22.5%" : days === 90 ? "+35.8%" : "+48.3%",
-            isPositive: true,
-            icon: userLogo
-        },
-        {
-            title: "Approved Agents",
-            value: Math.round(156 * getStatsForPeriod(7)).toLocaleString(),
-            growth: days === 7 ? "+12.5%" : days === 28 ? "+18.3%" : days === 90 ? "+28.7%" : "+42.1%",
-            isPositive: true,
-            icon: boxLogo
-        },
-        {
-            title: "Total Bids",
-            value: Math.round(8542 * getStatsForPeriod(7)).toLocaleString(),
-            growth: days === 7 ? "+24.8%" : days === 28 ? "+31.2%" : days === 90 ? "+45.6%" : "+58.9%",
-            isPositive: true,
-            icon: graphLogo
-        },
-        {
-            title: "Total Revenue",
-            value: "$" + Math.round(45280 * getStatsForPeriod(7)).toLocaleString(),
-            growth: days === 7 ? "+15.3%" : days === 28 ? "+20.8%" : days === 90 ? "+32.4%" : "+44.7%",
-            isPositive: true,
-            icon: clockLogo
-        }
+  const [data, setData] = useState<AgentSummary | AdminSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+
+    const daysValue = normalizeDays(days);
+
+    if (normalizedRole === "agent") {
+      getAgentSummary(daysValue)
+        .then(setData)
+        .finally(() => setLoading(false));
+    }
+
+    if (normalizedRole === "admin") {
+      getAdminSummary(daysValue)
+        .then(setData)
+        .finally(() => setLoading(false));
+    }
+  }, [days, normalizedRole]);
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className="h-[120px] bg-white rounded-[14px] shadow animate-pulse"
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  /* =======================
+     ADMIN STATS
+  ======================= */
+
+  if (normalizedRole === "admin") {
+    const admin = data as AdminSummary;
+
+    const stats = [
+      {
+        title: "Total Users",
+        value: admin.totalUsers.toLocaleString(),
+        positive: true,
+        icon: userLogo,
+      },
+      {
+        title: "Approved Agents",
+        value: admin.approvedAgents.toLocaleString(),
+        positive: true,
+        icon: boxLogo,
+      },
+      {
+        title: "Total Bids",
+        value: admin.totalBids.toLocaleString(),
+        positive: true,
+        icon: graphLogo,
+      },
+      {
+        title: "Total Revenue",
+        value: `RM ${admin.totalRevenue.toFixed(2)}`,
+        positive: admin.totalRevenue > 0,
+        icon: clockLogo,
+      },
     ];
-
-    const agentStats: StatCard[] = [
-        {
-            title: "Total Bids",
-            value: Math.round(342 * getStatsForPeriod(7)).toLocaleString(),
-            growth: days === 7 ? "+8.4%" : days === 28 ? "+14.2%" : days === 90 ? "+25.6%" : "+38.9%",
-            isPositive: true,
-            icon: userLogo
-        },
-        {
-            title: "Total Commission",
-            value: Math.round(1248 * getStatsForPeriod(7)).toLocaleString(),
-            growth: days === 7 ? "+16.7%" : days === 28 ? "+23.4%" : days === 90 ? "+36.8%" : "+49.2%",
-            isPositive: true,
-            icon: boxLogo
-        },
-        {
-            title: "Total Winnings",
-            value: Math.round(89 * getStatsForPeriod(7)).toLocaleString(),
-            growth: days === 7 ? "-3.2%" : days === 28 ? "+2.1%" : days === 90 ? "+8.5%" : "+15.3%",
-            isPositive: days !== 7,
-            icon: graphLogo
-        },
-        {
-            title: "Total Looses",
-            value: "$" + Math.round(3840 * getStatsForPeriod(7)).toLocaleString(),
-            growth: days === 7 ? "+22.1%" : days === 28 ? "+28.7%" : days === 90 ? "+41.3%" : "+54.8%",
-            isPositive: true,
-            icon: clockLogo
-        }
-    ];
-
-    const stats = role === 'admin' ? adminStats : agentStats;
 
     return (
-        <div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 w-full gap-4">
-                {stats.map((stat, index) => (
-                    <div key={index} className="bg-white flex flex-col items-center justify-center shadow rounded-[14px] p-4">
-                        <div className='flex flex-row items-center justify-between w-full'>
-                            <div>
-                                <div className="text-[#202224] text-[16px]">{stat.title}</div>
-                                <div className="text-[28px] font-bold mt-2">{stat.value}</div>
-                            </div>
-                            <Image src={stat.icon} alt={stat.title} className="w-15" />
-                        </div>
-                        <div className="flex gap-1 font-medium text-[#606060] mt-1">
-                            <span className={`${stat.isPositive ? 'text-[#00B69B]' : 'text-[#F93C65]'} flex flex-row items-center justify-center`}>
-                                {stat.isPositive ? <MdTrendingUp /> : <MdTrendingDown />}
-                                {stat.growth}
-                            </span> from previous period
-                        </div>
-                    </div>
-                ))}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map((s, i) => (
+          <div
+            key={i}
+            className="bg-white shadow rounded-[14px] p-4"
+          >
+            <div className="flex justify-between items-center">
+              <div>
+                <div className="text-[#202224] text-[16px]">
+                  {s.title}
+                </div>
+                <div className="text-[28px] font-bold mt-2">
+                  {s.value}
+                </div>
+              </div>
+              <Image src={s.icon} alt={s.title} className="w-14 h-14" />
             </div>
-        </div>
-    )
-}
 
-export default Stats
+            <div className="flex items-center gap-1 text-sm mt-2">
+              <span
+                className={`flex items-center gap-1 ${
+                  s.positive ? "text-[#00B69B]" : "text-[#F93C65]"
+                }`}
+              >
+                {s.positive ? <MdTrendingUp /> : <MdTrendingDown />}
+                {s.positive ? "Positive" : "Negative"}
+              </span>
+              period
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  /* =======================
+     AGENT STATS (existing)
+  ======================= */
+
+  const agent = data as AgentSummary;
+
+  const agentStats = [
+    {
+      title: "Total Bids",
+      value: agent.totalBids.toLocaleString(),
+      positive: true,
+      icon: userLogo,
+    },
+    {
+      title: "Total Commission",
+      value: `RM ${agent.totalCommission.toFixed(2)}`,
+      positive: agent.totalCommission >= 0,
+      icon: boxLogo,
+    },
+    {
+      title: "Total Winnings",
+      value: `RM ${agent.totalWinnings.toFixed(2)}`,
+      positive: agent.totalWinnings > 0,
+      icon: graphLogo,
+    },
+    {
+      title: "Total Losses",
+      value: `RM ${agent.totalLosses.toFixed(2)}`,
+      positive: false,
+      icon: clockLogo,
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {agentStats.map((s, i) => (
+        <div
+          key={i}
+          className="bg-white shadow rounded-[14px] p-4"
+        >
+          <div className="flex justify-between items-center">
+            <div>
+              <div className="text-[#202224] text-[16px]">
+                {s.title}
+              </div>
+              <div className="text-[28px] font-bold mt-2">
+                {s.value}
+              </div>
+            </div>
+            <Image src={s.icon} alt={s.title} className="w-14 h-14" />
+          </div>
+
+          <div className="flex items-center gap-1 text-sm mt-2">
+            <span
+              className={`flex items-center gap-1 ${
+                s.positive ? "text-[#00B69B]" : "text-[#F93C65]"
+              }`}
+            >
+              {s.positive ? <MdTrendingUp /> : <MdTrendingDown />}
+              {s.positive ? "Positive" : "Negative"}
+            </span>
+            period
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export default Stats;
