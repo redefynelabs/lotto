@@ -398,7 +398,7 @@ const Page = () => {
               type="button"
               onClick={handleRegister}
               disabled={isSubmitting}
-              className="w-full bg-primary text-white py-3 rounded-[4px] font-semibold hover:bg-primary/90 disabled:opacity-50 text-lg"
+              className="w-full bg-primary text-white py-3 rounded-[4px] cursor-pointer font-semibold hover:bg-primary/90 disabled:opacity-50 text-lg"
             >
               {isSubmitting ? "Submitting…" : "Register"}
             </button>

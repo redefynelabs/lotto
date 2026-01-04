@@ -4,7 +4,6 @@ import { Poster } from "@/components/Reusable/Images";
 import { Input } from "@/components/ui/input";
 import Image from "next/image";
 import { useState, FormEvent } from "react";
-import ContainerLayout from "@/layout/ContainerLayout";
 import { useRouter } from "next/navigation";
 import { login } from "@/services/Auth";
 import { toast } from "react-toastify";
@@ -13,35 +12,33 @@ import { FaArrowLeft } from "react-icons/fa6";
 
 const Page = () => {
   const router = useRouter();
+
   const [formData, setFormData] = useState({
-    phone: "",
+    email: "",
     password: "",
   });
+
   const [errors, setErrors] = useState({
-    phone: "",
+    email: "",
     password: "",
   });
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const isValidPhone = (phone: string) => {
-    const malaysiaRegex = /^01\d{8,9}$/; // 10–11 digits
-    const indiaRegex = /^[6-9]\d{9}$/; // exactly 10 digits
-
-    return malaysiaRegex.test(phone) || indiaRegex.test(phone);
+  // ✅ Email validation
+  const isValidEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
   const validateForm = () => {
-    const newErrors = {
-      phone: "",
-      password: "",
-    };
+    const newErrors = { email: "", password: "" };
     let isValid = true;
 
-    if (!formData.phone.trim()) {
-      newErrors.phone = "Phone number is required";
+    if (!formData.email.trim()) {
+      newErrors.email = "Email is required";
       isValid = false;
-    } else if (!isValidPhone(formData.phone)) {
-      newErrors.phone = "Enter a valid Malaysian or Indian phone number";
+    } else if (!isValidEmail(formData.email)) {
+      newErrors.email = "Enter a valid email address";
       isValid = false;
     }
 
@@ -62,13 +59,13 @@ const Page = () => {
 
     try {
       const response = await login({
-        phone: formData.phone,
+        email: formData.email,
         password: formData.password,
       });
 
       toast.success("Login successful!");
 
-      // Smart redirect
+      // ✅ Smart redirect (unchanged)
       if (response.user.role === "ADMIN") {
         router.push("/admin");
       } else if (response.user.role === "AGENT") {
@@ -88,21 +85,10 @@ const Page = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
 
-    // Only allow digits for phone field
-    if (name === "phone" && value && !/^\d*$/.test(value)) {
-      return;
-    }
+    setFormData({ ...formData, [name]: value });
 
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
-    // Clear error when user starts typing
     if (errors[name as keyof typeof errors]) {
-      setErrors({
-        ...errors,
-        [name]: "",
-      });
+      setErrors({ ...errors, [name]: "" });
     }
   };
 
@@ -134,23 +120,22 @@ const Page = () => {
           Login
         </h1>
         <p className="text-sm sm:text-base text-gray-500 mb-6">
-          Login to access your account
+          Login using your email address
         </p>
 
         <form onSubmit={handleSubmit} className="w-full space-y-4">
           <div>
             <Input
-              type="tel"
-              name="phone"
-              label="Phone Number"
-              placeholder="01XXXXXXXXX"
-              value={formData.phone}
+              type="email"
+              name="email"
+              label="Email Address"
+              placeholder="you@example.com"
+              value={formData.email}
               onChange={handleChange}
-              maxLength={11}
-              className={errors.phone ? "border-red-500" : ""}
+              className={errors.email ? "border-red-500" : ""}
             />
-            {errors.phone && (
-              <p className="text-red-500 text-xs mt-1">{errors.phone}</p>
+            {errors.email && (
+              <p className="text-red-500 text-xs mt-1">{errors.email}</p>
             )}
           </div>
 
@@ -178,21 +163,19 @@ const Page = () => {
             </Link>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="flex-1 bg-primary text-white py-2.5 rounded-[4px] font-semibold hover:bg-primary/90 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? "Logging in..." : "Login"}
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full bg-primary text-white py-2.5 rounded-[4px] font-semibold hover:bg-primary/90 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? "Logging in..." : "Login"}
+          </button>
         </form>
 
-        <p className=" py-4">
-          Don't have an account?{" "}
-          <Link href={"/sign-up"} className=" text-primary">
-            Signup.
+        <p className="py-4">
+          Don&apos;t have an account?{" "}
+          <Link href="/sign-up" className="text-primary">
+            Signup
           </Link>
         </p>
       </div>

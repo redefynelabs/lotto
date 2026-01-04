@@ -4,7 +4,11 @@ import { useState, FormEvent } from "react";
 import ContainerLayout from "@/layout/ContainerLayout";
 import { Input } from "@/components/ui/input";
 import { toast } from "react-toastify";
-import { sendForgotOtp, verifyForgotOtp, resetPassword } from "@/services/Auth";
+import {
+  sendForgotOtp,
+  verifyForgotOtp,
+  resetPassword,
+} from "@/services/Auth";
 import { Poster } from "@/components/Reusable/Images";
 import Image from "next/image";
 
@@ -13,33 +17,41 @@ const ForgotPasswordPage = () => {
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
-    phone: "",
+    email: "",
     otp: "",
     newPassword: "",
   });
 
   const [resetToken, setResetToken] = useState("");
 
-  const handleChange = (e: any) => {
+  const isValidEmail = (email: string) =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   // ------------------------
-  // STEP 1: Send OTP
+  // STEP 1: Send OTP (EMAIL)
   // ------------------------
   const handleSendOtp = async (e: FormEvent) => {
     e.preventDefault();
 
-    if (formData.phone.trim().length !== 10) {
-      toast.error("Enter a valid 10-digit phone number");
+    if (!formData.email.trim()) {
+      toast.error("Email is required");
+      return;
+    }
+
+    if (!isValidEmail(formData.email)) {
+      toast.error("Enter a valid email address");
       return;
     }
 
     setLoading(true);
 
     try {
-      await sendForgotOtp({ phone: formData.phone });
-      toast.success("OTP sent to phone");
+      await sendForgotOtp({ email: formData.email });
+      toast.success("OTP sent to your email");
       setStep(2);
     } catch (err: any) {
       toast.error(err.message || "Failed to send OTP");
@@ -53,6 +65,7 @@ const ForgotPasswordPage = () => {
   // ------------------------
   const handleVerifyOtp = async (e: FormEvent) => {
     e.preventDefault();
+
     if (!formData.otp.trim()) {
       toast.error("Enter OTP");
       return;
@@ -61,7 +74,7 @@ const ForgotPasswordPage = () => {
     setLoading(true);
     try {
       const res = await verifyForgotOtp({
-        phone: formData.phone,
+        email: formData.email,
         otp: formData.otp,
       });
 
@@ -106,7 +119,6 @@ const ForgotPasswordPage = () => {
   return (
     <ContainerLayout>
       <div className="flex flex-col lg:flex-row items-center justify-center gap-10 py-10">
-        
         {/* Left Side Poster */}
         <div className="flex justify-center items-center w-full lg:w-auto">
           <Image
@@ -127,22 +139,22 @@ const ForgotPasswordPage = () => {
             Reset your account password
           </p>
 
-          {/* STEP 1: Phone */}
+          {/* STEP 1: Email */}
           {step === 1 && (
             <form onSubmit={handleSendOtp} className="space-y-4">
               <Input
-                name="phone"
-                label="Phone Number"
-                placeholder="9*********"
-                maxLength={10}
-                value={formData.phone}
+                name="email"
+                type="email"
+                label="Email Address"
+                placeholder="you@example.com"
+                value={formData.email}
                 onChange={handleChange}
               />
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-primary text-white py-2.5 rounded-md font-semibold"
+                className="w-full bg-primary cursor-pointer text-white py-2.5 rounded-md font-semibold"
               >
                 {loading ? "Sending..." : "Send OTP"}
               </button>

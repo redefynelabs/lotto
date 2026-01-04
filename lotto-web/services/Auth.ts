@@ -1,7 +1,7 @@
 import api from "@/lib/api";
 
 interface LoginRequest {
-  phone: string;
+  email: string;
   password: string;
 }
 
@@ -105,7 +105,7 @@ export const logout = async () => {
 // ---------------------------
 //  FORGOT PASSWORD — SEND OTP
 // ---------------------------
-export const sendForgotOtp = async (data: { phone: string }) => {
+export const sendForgotOtp = async (data: { email: string }) => {
   try {
     const res = await api.post("/auth/forgot-password", data);
 
@@ -120,7 +120,7 @@ export const sendForgotOtp = async (data: { phone: string }) => {
 // ---------------------------
 //  VERIFY OTP FOR RESET
 // ---------------------------
-export const verifyForgotOtp = async (data: { phone: string; otp: string }) => {
+export const verifyForgotOtp = async (data: { email: string; otp: string }) => {
   try {
     const res = await api.post("/auth/forgot-password/verify", data);
 
