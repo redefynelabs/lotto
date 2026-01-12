@@ -28,6 +28,7 @@ const MakeaBid = () => {
   const [timeLeft, setTimeLeft] = useState("00:00:00");
   const [winnerNumber, setWinnerNumber] = useState("??");
   const [displayDate, setDisplayDate] = useState({ month: "", date: "" });
+  const [isMuted, setIsMuted] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -244,6 +245,16 @@ const MakeaBid = () => {
 
   const hasResult = winnerNumber !== "??";
 
+  const getVideoSrc = (winner: string) => {
+    if (winner === "??") {
+      return "https://server.lotto.redefyne.in/videos/balls-spin.mp4";
+    }
+
+    // remove leading zero (e.g. "02" → "2")
+    const num = Number(winner);
+    return `https://server.lotto.redefyne.in/videos/${num}.mp4`;
+  };
+
   /* ------------------------------------------------------------------ */
   /* RENDER                                                             */
   /* ------------------------------------------------------------------ */
@@ -251,16 +262,33 @@ const MakeaBid = () => {
   return (
     <div className="min-h-screen flex flex-col gap-5 lg:flex-row">
       {/* Video */}
-      <div className="w-full lg:w-[50%] h-[40vh] md:h-[50vh] lg:h-auto flex items-center justify-center rounded-lg">
+      <div className="relative w-full lg:w-[50%] h-[40vh] md:h-[50vh] lg:h-auto flex items-center justify-center rounded-lg">
         <video
+          key={winnerNumber}
           ref={videoRef}
           className="max-w-full max-h-full object-contain rounded-xl"
           playsInline
-          muted   
-          preload="metadata"
+          muted={isMuted}
+          autoPlay
+          preload="auto"
+          loop={winnerNumber === "??"}
         >
-          <source src="/videos/10.mp4" type="video/mp4" />
+          <source src={getVideoSrc(winnerNumber)} type="video/mp4" />
         </video>
+
+        {/* 🔊 Mute / Unmute Button */}
+        <button
+          onClick={() => {
+            setIsMuted((m) => !m);
+            if (videoRef.current) {
+              videoRef.current.muted = !isMuted;
+            }
+          }}
+          className="absolute bottom-[25%] right-4 bg-black/60 hover:bg-black/80 text-white p-3 rounded-full backdrop-blur-md transition"
+          aria-label={isMuted ? "Unmute video" : "Mute video"}
+        >
+          {isMuted ? "🔇" : "🔊"}
+        </button>
       </div>
 
       {/* Content */}
