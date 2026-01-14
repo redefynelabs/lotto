@@ -404,7 +404,7 @@ const BidSettingsPage = () => {
               onClick={handleSave}
               disabled={saving}
               size="lg"
-              className="min-w-[180px] h-12 text-base shadow-lg hover:shadow-xl transition-all"
+              className="min-w-[180px] cursor-pointer h-12 text-base shadow-lg hover:shadow-xl transition-all"
             >
               {saving ? (
                 <>
