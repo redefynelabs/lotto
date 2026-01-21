@@ -165,7 +165,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
   const SidebarContent = () => (
     <>
       <Link href={"/"} className="p-4 flex items-center justify-center">
-        <Image src={CompanyLogo} alt="32 win" className="w-16" />
+        <Image src={'/logo.png'} alt="32 win" className="w-28" />
       </Link>
 
       <nav className="flex-1 overflow-y-auto py-4">

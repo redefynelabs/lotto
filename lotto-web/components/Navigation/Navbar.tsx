@@ -5,7 +5,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { HiMenuAlt3, HiX, HiUser, HiLogout, HiViewGrid } from "react-icons/hi";
 import { NAV_ITEMS } from "../../constants/Nav";
-import CompanyLogo from "@/public/companyLogo.png";
 import { logout } from "@/services/Auth";
 
 const Navbar = () => {
@@ -49,7 +48,7 @@ const Navbar = () => {
         
         {/* LOGO */}
         <Link href="/" className="flex items-center gap-2">
-          <Image src={CompanyLogo} alt="Logo" width={55} height={55} />
+          <Image src={'/logo.png'} alt="Logo" width={100} height={55} />
         </Link>
 
         {/* DESKTOP NAV */}

@@ -44,9 +44,9 @@ export default function NavbarClient({ user }: { user: any }) {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
           <Image
-            src={CompanyLogo}
+            src={'/logo.png'}
             alt="Company Logo"
-            width={55}
+            width={100}
             height={55}
             className="object-contain"
             priority

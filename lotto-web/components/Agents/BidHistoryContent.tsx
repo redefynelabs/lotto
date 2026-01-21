@@ -216,7 +216,7 @@ const BidTicketModal = ({
     >
       {/* Logo */}
       <img
-        src="/companyLogo.png"
+        src="/logo.png"
         alt="Logo"
         className="mx-auto h-10"
         crossOrigin="anonymous"
